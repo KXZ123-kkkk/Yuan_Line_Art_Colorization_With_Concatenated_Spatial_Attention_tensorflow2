@@ -48,7 +48,8 @@ def loss_FM(model_D, model_G, line, hint, real):
         out_1 = model_(model_d_layers)
         out_2 = model_(model_d_2_layers)
         loss_ = tf.reduce_mean(
-            tf.losses.mae(out_1, out_2) / tf.reshape(out_1, [out_1.shape[1] * out_1.shape[2] * out_1.shape[3]]).shape[
+            tf.losses.mae(out_1, out_2) /
+            tf.reshape(out_1, [out_1.shape[0] * out_1.shape[1] * out_1.shape[2] * out_1.shape[3]]).shape[
                 0])
         loss += loss_
     return loss
@@ -79,12 +80,11 @@ def loss_perc(model_G, model_vgg, line, hint, real):
                 model_v = tf.keras.Model(inputs_v, output_v)
                 vgg_1 = model_v(real)
                 vgg_2 = model_v(fake)
-                loss_ = tf.reduce_mean(tf.losses.mae(vgg_1, vgg_2) / tf.reshape(ls_1[i - 1], [
-                ls_1[i - 1].shape[1] * ls_1[i - 1].shape[2] * ls_1[i - 1].shape[3]]).shape[0])
+                loss_ = tf.reduce_mean(tf.losses.mae(vgg_1, vgg_2) / tf.reshape(vgg_1, [vgg_1.shape[0]*vgg_1.shape[1] * vgg_1.shape[2] * vgg_1.shape[3]]).shape[0])
                 loss += loss_
         else:
             loss_ = tf.reduce_mean(tf.losses.mae(ls_1[i - 1], ls_2[i - 1]) / tf.reshape(ls_1[i - 1], [
-                ls_1[i - 1].shape[1] * ls_1[i - 1].shape[2] * ls_1[i - 1].shape[3]]).shape[0])
+                ls_1[i - 1].shape[0] * ls_1[i - 1].shape[1] * ls_1[i - 1].shape[2] * ls_1[i - 1].shape[3]]).shape[0])
             loss += loss_
     return loss
 
