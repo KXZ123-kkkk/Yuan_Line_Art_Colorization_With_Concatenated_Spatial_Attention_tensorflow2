@@ -138,14 +138,14 @@ class ConvBlock_Norm(keras.Model):
         if spec_norm:
             self.main = keras.Sequential([
                 tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim_out, kernel_size=3, strides=stride,
-                                    padding="same", use_bias=False)),
+                                    padding="same")),
                 keras.layers.BatchNormalization(trainable=is_training),
                 keras.layers.LeakyReLU(LR)
             ])
         else:
             self.main = keras.Sequential([
                 keras.layers.Conv2D(dim_out, kernel_size=3, strides=stride,
-                                    padding="same", use_bias=False),
+                                    padding="same"),
                 keras.layers.BatchNormalization(trainable=is_training),
                 keras.layers.LeakyReLU(LR)
             ])

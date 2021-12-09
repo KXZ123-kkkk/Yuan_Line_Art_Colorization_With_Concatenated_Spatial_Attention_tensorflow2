@@ -15,7 +15,7 @@ from hint import hint_getter
 
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
 def hint_(image):
@@ -48,11 +48,11 @@ def loss_FM(model_D, model_G, line, hint, real):
         out_1 = model_(model_d_layers)
         out_2 = model_(model_d_2_layers)
         loss_ = tf.reduce_mean(
-            tf.losses.mae(out_1, out_2) /
+            tf.norm(out_1 - out_2, ord=1) /
             tf.reshape(out_1, [out_1.shape[0] * out_1.shape[1] * out_1.shape[2] * out_1.shape[3]]).shape[
                 0])
         loss += loss_
-    return loss
+    return loss / layer_len
 
 
 def loss_cGan(model_D, model_G, line, hint, real):
@@ -80,7 +80,7 @@ def loss_perc(model_G, model_vgg, line, hint, real):
                 model_v = tf.keras.Model(inputs_v, output_v)
                 vgg_1 = model_v(real)
                 vgg_2 = model_v(fake)
-                loss_ = tf.reduce_mean(tf.losses.mae(vgg_1, vgg_2) / tf.reshape(vgg_1, [vgg_1.shape[0]*vgg_1.shape[1] * vgg_1.shape[2] * vgg_1.shape[3]]).shape[0])
+                loss_ = tf.reduce_mean(tf.norm(vgg_1 - vgg_2, ord=1) / tf.reshape(vgg_1, [vgg_1.shape[0]*vgg_1.shape[1] * vgg_1.shape[2] * vgg_1.shape[3]]).shape[0])
                 loss += loss_
         else:
             loss_ = tf.reduce_mean(tf.losses.mae(ls_1[i - 1], ls_2[i - 1]) / tf.reshape(ls_1[i - 1], [
@@ -93,7 +93,7 @@ def loss_G_ALL(G, F, D_16, D_32, D_64, line, hint, real):
     L_C_D16 = loss_cGan(D_16, G, line, hint, real)
     L_C_D32 = loss_cGan(D_32, G, line, hint, real)
     L_C_D64 = loss_cGan(D_64, G, line, hint, real)
-    print(L_C_D16)
+    # print(L_C_D16)
     # L_C_D16 = tf.reduce_mean(tf.reduce_mean(tf.squeeze(L_C_D16, axis=3), axis=2), 1)
     # L_C_D32 = tf.reduce_mean(tf.reduce_mean(tf.squeeze(L_C_D32, axis=3), axis=2), 1)
     # L_C_D64 = tf.reduce_mean(tf.reduce_mean(tf.squeeze(L_C_D64, axis=3), axis=2), 1)
@@ -169,8 +169,8 @@ def pro_test(sketch, real):
 def data_load_path_train():
     # color = glob.glob(r"image\color\*.png")
     # sketch = glob.glob(r"image\sketch\*.png")
-    color = glob.glob(r"D:\TensorFlow\实战集合\翻译2020\Kaggle\anime-sketch-colorization-pair\data\color\*.png")[:5]
-    sketch = glob.glob(r"D:\TensorFlow\实战集合\翻译2020\Kaggle\anime-sketch-colorization-pair\data\sketch\*.png")[:5]
+    color = glob.glob(r"/home/featurize/data/data/color/*.png")[:15000]
+    sketch = glob.glob(r"/home/featurize/data/data/sketch/*.png")[:15000]
     # print(color)
     # hint = glob.glob(r"image\hint\*.png")
     return (sketch, color)
@@ -223,12 +223,12 @@ def log(writer, steps, data, log_name="cat"):
     with writer.as_default():
         tf.summary.scalar(log_name, data, step=steps)
         writer.flush()
-    print(log_name, " ok!")
+#     print(log_name, " ok!")
 
 
 def main():
     train_data = tf.data.Dataset.from_tensor_slices(data_load_path_train())
-    train_data = train_data.map(pro_train).shuffle(60000).batch(1)
+    train_data = train_data.map(pro_train).shuffle(150).batch(3)
     # test_data = tf.data.Dataset.from_tensor_slices(data_load_path_test())
     # test_data = test_data.map(pro_test).shuffle(60000).batch(1)
 
@@ -265,41 +265,42 @@ def main():
         start = time.perf_counter()
         for index, (sketch, hint, real) in enumerate(train_data):
             fake = A_G([sketch, hint])
-            save_img(fake[0], r"results/fake{}.png".format(index))
-            save_img(tf.squeeze(sketch[0], axis=2), r"results/sketch{}.png".format(index), mode="L")
-            save_img(hint[0], r"results/hint{}.png".format(index))
-            save_img(real[0], r"results/real{}.png".format(index))
-            global loss_d
-            loss_d = 0
+
             with tf.GradientTape() as tp:
                 loss, d_loss = loss_G_ALL(A_G, F_E, D_16, D_32, D_64, sketch, hint, real)
-                loss_d = d_loss
-                print("G_loss:", tf.reduce_mean(loss).numpy())
+#                 print("G_loss:", tf.reduce_mean(loss).numpy())
                 log(writer_list[0], index, tf.reduce_mean(loss).numpy(), "G_loss")
             grad = tp.gradient(loss, A_G.trainable_variables)
             opt_A_G.apply_gradients(zip(grad, A_G.trainable_variables))
 
             with tf.GradientTape() as tp16:
-                loss_16 = loss_D(D_16, fake, real, sketch) + loss_d
+                loss_16 = loss_D(D_16, fake, real, sketch)
                 log(writer_list[1], index, loss_D_2_scalar(loss_16).numpy(), "D_16_loss")
 
             grad1 = tp16.gradient(loss_16, D_16.trainable_variables)
             opt_D_16.apply_gradients(zip(grad1, D_16.trainable_variables))
 
             with tf.GradientTape() as tp32:
-                loss_32 = loss_D(D_32, fake, real, sketch) + loss_d
+                loss_32 = loss_D(D_32, fake, real, sketch)
                 log(writer_list[2], index, loss_D_2_scalar(loss_32).numpy(), "D_32_loss")
             grad2 = tp32.gradient(loss_32, D_32.trainable_variables)
             opt_D_32.apply_gradients(zip(grad2, D_32.trainable_variables))
 
             with tf.GradientTape() as tp64:
-                loss_64 = loss_D(D_64, fake, real, sketch) + loss_d
+                loss_64 = loss_D(D_64, fake, real, sketch)
                 log(writer_list[3], index, loss_D_2_scalar(loss_64).numpy(), "D_64_loss")
             grad3 = tp64.gradient(loss_64, D_64.trainable_variables)
             opt_D_64.apply_gradients(zip(grad3, D_64.trainable_variables))
             end = time.perf_counter()
-            print("time: ", end - start / 60, " min")
-            if index % 5 == 0:
+#             print("time: ", end - start / 60, " min")
+            if index % 3 == 0 and index != 0:
+                print("G_loss:", tf.reduce_mean(loss).numpy())
+            if index % 20 == 0 and index != 0:
+                    save_img(fake[0], r"results/fake{}.png".format(index))
+#             save_img(tf.squeeze(sketch[0], axis=2), r"results/sketch{}.png".format(index), mode="L")
+#             save_img(hint[0], r"results/hint{}.png".format(index))
+                    save_img(real[0], r"results/real{}.png".format(index))
+            if index % 500 == 0:
                 save_model(A_G, D_16, D_32, D_64)
 
 

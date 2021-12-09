@@ -46,7 +46,7 @@ def hint_getter(img):
     hint_map = np.ones_like(image)
     # np.random.randint(15, 256)
 
-    for i in range(image.shape[1]):
+    for i in range(int(image.shape[1]/2) * int(image.shape[1]/2)):
         hint_map = paintCel(hint_map, image, random)
     return hint_map
     # save_img(hint_map, r"C:\Users\ASUS\Desktop\99.png", data_mode="numpy")
